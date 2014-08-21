@@ -21,8 +21,10 @@
 
 #include <stdint.h>     /* uint's below */
 
+#define DEBUG
+
 #ifndef COMMAND_LINE_SIZE
-#define COMMAND_LINE_SIZE 1024
+#define COMMAND_LINE_SIZE 8192
 #endif
 
 /*

@@ -178,9 +178,9 @@ void start_kernel(struct params_t *params, int choice)
 #endif
 	const char mount_point[] = MOUNTPOINT;
 
-	const char str_cmdline_start[] = "--command-line=root=";
-	const char str_rootfstype[] = " rootfstype=";
-	const char str_rootwait[] = " rootwait";
+	const char str_cmdline_start[] = "--command-line=";
+	const char str_rootfstype[] = "";
+	const char str_rootwait[] = "";
 	const char str_ubirootdev[] = "ubi0";
 	const char str_ubimtd[] = " ubi.mtd="; /* max ' ubi.mtd=15' len 11 +1 = 12 */
 
@@ -195,137 +195,131 @@ void start_kernel(struct params_t *params, int choice)
 	char str_mtd_id[3];
 
 	/* Tags passed from host kernel cmdline to kexec'ed kernel */
-	const char str_mtdparts[] = " mtdparts=";
-	const char str_fbcon[] = " fbcon=";
+	//const char str_mtdparts[] = " mtdparts=";
+	//const char str_fbcon[] = " fbcon=";
 
-	const char str_initrd_start[] = "--initrd=";
+	//const char str_initrd_start[] = "--initrd=";
 
 	/* empty environment */
-	char *const envp[] = { NULL };
+	//char *const envp[] = { NULL };
 
-	const char *load_argv[] = { NULL, "-l", NULL, NULL, NULL, NULL };
-	const char *exec_argv[] = { NULL, "-e", NULL, NULL};
+	//const char *load_argv[] = { NULL, "--load-hardboot --mem-min=0x50000000", NULL, NULL, NULL, NULL };
+	//const char *exec_argv[] = { NULL, "-e", NULL, NULL};
 
-	char *cmdline_arg = NULL, *initrd_arg = NULL;
-	int n, idx, u;
-	struct stat sinfo;
+    char kexec_arg[10000];
+
+	//char *cmdline_arg = NULL, *initrd_arg = NULL;
+	//int n, idx, u;
+	//struct stat sinfo;
 	struct boot_item_t *item;
 
 	item = params->bootcfg->list[choice];
 
-	exec_argv[0] = kexec_path;
-	load_argv[0] = kexec_path;
+	//exec_argv[0] = kexec_path;
+	//load_argv[0] = kexec_path;
 
 	/* --command-line arg generation */
-	idx = 2;	/* load_argv current option index */
+	//idx = 2;	/* load_argv current option index */
 
 	/* fill '--command-line' option */
 	if (item->device) {
 		/* default device to mount */
 		strcpy(mount_dev, item->device);
 
+		if (item->fstype) {
+			/* default fstype to mount */
+			strcpy(mount_fstype, item->fstype);
+        }
+
 		/* allocate space */
-		n = sizeof(str_cmdline_start) + strlen(item->device) +
-				sizeof(str_ubirootdev) + 2 +
-				sizeof(str_ubimtd) + 2 + sizeof(str_ubimtd_off) + 1 +
-				sizeof(str_rootwait) +
-				sizeof(str_rootfstype) + strlen(item->fstype) + 2 +
-				sizeof(str_mtdparts) + strlenn(params->cfg->mtdparts) +
-				sizeof(str_fbcon) + strlenn(params->cfg->fbcon) +
-				sizeof(char) + strlenn(item->cmdline);
+		//n = sizeof(str_cmdline_start) + strlen(item->device) +
+		//		sizeof(str_ubirootdev) + 2 +
+		//		sizeof(str_ubimtd) + 2 + sizeof(str_ubimtd_off) + 1 +
+		//		sizeof(str_rootwait) +
+		//		sizeof(str_rootfstype) + strlen(item->fstype) + 2 +
+		//		sizeof(str_mtdparts) + strlenn(params->cfg->mtdparts) +
+		//		sizeof(str_fbcon) + strlenn(params->cfg->fbcon) +
+		//		sizeof(char) + strlenn(item->cmdline);
 
-		cmdline_arg = (char *)malloc(n);
-		if (NULL == cmdline_arg) {
-			perror("Can't allocate memory for cmdline_arg");
-		} else {
 
-			strcpy(cmdline_arg, str_cmdline_start);	/* --command-line=root= */
+        //Start kexec command with path to kexec tools binary
+        strcpy(kexec_arg, kexec_path);
 
-			if (item->fstype) {
+        //Add " --load-hardboot --mem-min=0x50000000"
+        strcat(kexec_arg, " --load-hardboot --mem-min=0x50000000");
 
-				/* default fstype to mount */
-				strcpy(mount_fstype, item->fstype);
+        //Add " --command-line="
+        strcat(kexec_arg, " --command-line=");
 
-				/* extra tags when we detect UBI */
-				if (!strncmp(item->fstype,"ubi",3)) {
+        //Add command line
+        strcat(kexec_arg, item->cmdline);
 
-					/* mtd id [0-15] - one or two digits */
-					if(isdigit(atoi(item->device+strlen(item->device)-2))) {
-						strcpy(str_mtd_id, item->device+strlen(item->device)-2);
-						strcat(str_mtd_id, item->device+strlen(item->device)-1);
-					} else {
-						strcpy(str_mtd_id, item->device+strlen(item->device)-1);
-					}
-					/* get corresponding ubi dev to mount */
-					u = find_attached_ubi_device(str_mtd_id);
+        //Add " --initrd="
+        strcat(kexec_arg, " --initrd=");
 
-					sprintf(mount_dev, "/dev/ubi%d", u);
-					 /* FIXME: first volume is hardcoded */
-					strcat(mount_dev, "_0");
+        //Add initrd path
+        strcat(kexec_arg, item->initrd);
 
-					/* HARDCODED: we assume it's ubifs */
-					strcpy(mount_fstype,"ubifs");
+        //Add a space
+        strcat(kexec_arg, " ");
 
-					/* extra cmdline tags when we detect ubi */
-					strcat(cmdline_arg, str_ubirootdev);
-					 /* FIXME: first volume is hardcoded */
-					strcat(cmdline_arg, "_0");
+        //Add kernel path
+        strcat(kexec_arg, item->kernelpath);
 
-					strcat(cmdline_arg, str_ubimtd);
-					strcat(cmdline_arg, str_mtd_id);
-#ifdef UBI_VID_HDR_OFFSET
-					strcat(cmdline_arg, ",");
-					strcat(cmdline_arg, str_ubimtd_off);
-#endif
-				} else {
-					strcat(cmdline_arg, item->device); /* root=item->device */
-				}
-				strcat(cmdline_arg, str_rootfstype);
-				strcat(cmdline_arg, mount_fstype);
-			}
-			strcat(cmdline_arg, str_rootwait);
+		//cmdline_arg = (char *)malloc(n);
+		//if (NULL == cmdline_arg) {
+		//	perror("Can't allocate memory for cmdline_arg");
+		//} else {
 
-			if (params->cfg->mtdparts) {
-				strcat(cmdline_arg, str_mtdparts);
-				strcat(cmdline_arg, params->cfg->mtdparts);
-			}
+		//	strcpy(cmdline_arg, str_cmdline_start);	/* --command-line=root= */
 
-			if (params->cfg->fbcon) {
-				strcat(cmdline_arg, str_fbcon);
-				strcat(cmdline_arg, params->cfg->fbcon);
-			}
 
-			if (item->cmdline) {
-				strcat(cmdline_arg, " ");
-				strcat(cmdline_arg, item->cmdline);
-			}
-			load_argv[idx] = cmdline_arg;
-			++idx;
-		}
+		//	}
+			//strcat(cmdline_arg, str_rootwait);
+
+			//if (params->cfg->mtdparts) {
+			//	strcat(cmdline_arg, str_mtdparts);
+			//	strcat(cmdline_arg, params->cfg->mtdparts);
+			//}
+
+			//if (params->cfg->fbcon) {
+			//	strcat(cmdline_arg, str_fbcon);
+			//	strcat(cmdline_arg, params->cfg->fbcon);
+			//}
+
+		//	if (item->cmdline) {
+		//		strcat(cmdline_arg, " ");
+		//		strcat(cmdline_arg, item->cmdline);
+		//	}
+		//	load_argv[idx] = cmdline_arg;
+		//	++idx;
+		//}
 	}
 
 	/* fill '--initrd' option */
-	if (item->initrd) {
-		/* allocate space */
-		n = sizeof(str_initrd_start) + strlen(item->initrd);
+	//if (item->initrd) {
+	//	/* allocate space */
+	//	n = sizeof(str_initrd_start) + strlen(item->initrd);
 
-		initrd_arg = (char *)malloc(n);
-		if (NULL == initrd_arg) {
-			perror("Can't allocate memory for initrd_arg");
-		} else {
-			strcpy(initrd_arg, str_initrd_start);	/* --initrd= */
-			strcat(initrd_arg, item->initrd);
-			load_argv[idx] = initrd_arg;
-			++idx;
-		}
-	}
+	//	initrd_arg = (char *)malloc(n);
+	//	if (NULL == initrd_arg) {
+	//		perror("Can't allocate memory for initrd_arg");
+	//	} else {
+	//		strcpy(initrd_arg, str_initrd_start);	/* --initrd= */
+	//		strcat(initrd_arg, item->initrd);
+	//		load_argv[idx] = initrd_arg;
+	//		++idx;
+	//	}
+	//}
 
 	/* Append kernelpath as last arg of kexec */
-	load_argv[idx] = item->kernelpath;
+	//load_argv[idx] = item->kernelpath;
 
-	DPRINTF("load_argv: %s, %s, %s, %s, %s", load_argv[0],
-			load_argv[1], load_argv[2],
-			load_argv[3], load_argv[4]);
+	//DPRINTF("load_argv: %s, %s, %s, %s, %s", load_argv[0],
+	//		load_argv[1], load_argv[2],
+	//		load_argv[3], load_argv[4]);
+
+    //DPRINTF("load_argv: %s", (char *const *)load_argv);
 
 	/* Mount boot device */
 	if ( -1 == mount(mount_dev, mount_point, mount_fstype,
@@ -334,34 +328,42 @@ void start_kernel(struct params_t *params, int choice)
 		exit(-1);
 	}
 
+    DPRINTF("kexec command: %s", kexec_arg);
+
+    system(kexec_arg);
+
 	/* Load kernel */
-	n = fexecw(kexec_path, (char *const *)load_argv, envp);
-	if (-1 == n) {
-		perror("Kexec can't load kernel");
-		exit(-1);
-	}
+	//n = fexecw(kexec_path, (char *const *)load_argv, envp);
+	//if (-1 == n) {
+	//	perror("Kexec can't load kernel");
+	//	exit(-1);
+	//}
 
 	umount(mount_point);
 
-	dispose(cmdline_arg);
-	dispose(initrd_arg);
+	//dispose(cmdline_arg);
+	//dispose(initrd_arg);
 
 	/* Check /proc/sys/net presence */
-	if ( -1 == stat("/proc/sys/net", &sinfo) ) {
-		if (ENOENT == errno) {
-			/* We have no network, don't issue ifdown() while kexec'ing */
-			exec_argv[2] = "-x";
-			DPRINTF("No network is detected, disabling ifdown()");
-		} else {
-			perror("Can't stat /proc/sys/net");
-		}
-	}
+	//if ( -1 == stat("/proc/sys/net", &sinfo) ) {
+	//	if (ENOENT == errno) {
+	//		/* We have no network, don't issue ifdown() while kexec'ing */
+	//		exec_argv[2] = "-x";
+	//		DPRINTF("No network is detected, disabling ifdown()");
+	//	} else {
+	//		perror("Can't stat /proc/sys/net");
+	//	}
+	//}
 
-	DPRINTF("exec_argv: %s, %s, %s", exec_argv[0],
-			exec_argv[1], exec_argv[2]);
+    system("sync");
+
+	//DPRINTF("exec_argv: %s, %s, %s", exec_argv[0],
+	//		exec_argv[1], exec_argv[2]);
 
 	/* Boot new kernel */
-	execve(kexec_path, (char *const *)exec_argv, envp);
+	//execve(kexec_path, (char *const *)exec_argv, envp);
+
+    system("/usr/sbin/kexec -e");
 }
 
 

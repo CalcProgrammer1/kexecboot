@@ -422,7 +422,7 @@ int parse_cfgfile(char *path, struct cfgdata_t *cfgdata)
 	char *c;
 	char *keyword;
 	char *value;
-	char line[256];
+	char line[8192];
 
 	/* Open the config file */
 	f = fopen(path, "r");
