@@ -248,17 +248,23 @@ void start_kernel(struct params_t *params, int choice)
         //Add " --load-hardboot --mem-min=0x50000000"
         strcat(kexec_arg, " --load-hardboot --mem-min=0x50000000");
 
-        //Add " --command-line="
-        strcat(kexec_arg, " --command-line=");
+        if(item->cmdline)
+        {
+            //Add " --command-line="
+            strcat(kexec_arg, " --command-line=");
 
-        //Add command line
-        strcat(kexec_arg, item->cmdline);
+            //Add command line
+            strcat(kexec_arg, item->cmdline);
+        }
 
-        //Add " --initrd="
-        strcat(kexec_arg, " --initrd=");
+        if(item->initrd)
+        {
+            //Add " --initrd="
+            strcat(kexec_arg, " --initrd=");
 
-        //Add initrd path
-        strcat(kexec_arg, item->initrd);
+            //Add initrd path
+            strcat(kexec_arg, item->initrd);
+        }
 
         //Add a space
         strcat(kexec_arg, " ");
